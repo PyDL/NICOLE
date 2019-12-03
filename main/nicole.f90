@@ -1,4 +1,4 @@
-!                      N I C O L E   v 17.11
+!                      N I C O L E   v 19.11
 !       Non-LTE Inversion COde based on the Lorien Engine
 !         By Hector Socas-Navarro, Jaime de la Cruz and
 !                     Andres Asensio Ramos
@@ -84,7 +84,7 @@ Program Nicole
   If (myrank .eq. 0) then
      Print *,''
      Print *,''
-     Print *,'*************** N I C O L E   v 17.11 ******************'
+     Print *,'*************** N I C O L E   v 19.11 ******************'
      Print *,''
      Print *,'Lorien version: ',Lorien_ver
      Print *,'Forward version: ',Forward_ver
@@ -249,6 +249,8 @@ Program Nicole
   Read (headerunit, *) nodes%n_nodes_blong
   Read (headerunit, *) nodes%n_nodes_bx
   Read (headerunit, *) nodes%n_nodes_by
+  Read (headerunit, *) nodes%n_nodes_chrom_x
+  Read (headerunit, *) nodes%n_nodes_chrom_y
   Read (headerunit, *) nodes%n_nodes_stray
   Read (headerunit, *) nodes%n_nodes_mac
   Read (headerunit, *) nodes%n_nodes_ffactor
@@ -265,6 +267,8 @@ Program Nicole
   Read (headerunit, *) nodes%n_nodes_blong2
   Read (headerunit, *) nodes%n_nodes_bx2
   Read (headerunit, *) nodes%n_nodes_by2
+  Read (headerunit, *) nodes%n_nodes_chrom_x2
+  Read (headerunit, *) nodes%n_nodes_chrom_y2
   Read (headerunit, *) nodes%n_nodes_ab2
   ! Read abundances to invert
   If (nodes%n_nodes_ab2 .gt. 0) then
@@ -595,8 +599,8 @@ Program Nicole
              RealBytes*(nvarsdepth*Params%n_points+nvarssingle))
         Allocate (IntRecord(nvarsdepth*Params%n_points+nvarssingle)) ! Write signature 
         IntRecord(:)=0
-        IntRecord(1)=3328834590979877230_k18
-        IntRecord(2)=2314885530823516726_k18
+        IntRecord(1)=4049129056382445934_k18
+        IntRecord(2)=2314885530823504944_k18
         If (LittleEndian) then
            Integer4(1)=nPix_x
            Integer4(2)=nPix_y
@@ -629,8 +633,8 @@ Program Nicole
              RealBytes*(nvarsdepth*Params%n_points+nvarssingle))
         Allocate (IntRecord(nvarsdepth*Params%n_points+nvarssingle)) ! Write signature 
         IntRecord(:)=0
-        IntRecord(1)=3328834590979877230_k18
-        IntRecord(2)=2314885530823516723_k18
+        IntRecord(1)=4049129056382445934_k18
+        IntRecord(2)=2314885530823504944_k18
         If (LittleEndian) then
            Integer4(1)=nPix_x
            Integer4(2)=nPix_y
@@ -693,12 +697,24 @@ Program Nicole
            If (IprofUnit .gt. 0) then
               Call Read_direct(LittleEndian,IprofUnit,irec+1, &
                    Params%IProf, Params%n_data/4, iost1)
+              If (iost1 .gt. 0) then
+                 Print *,'Error reading Instrumental_profile.dat',iost1
+                 Stop
+              End if
            End if
            Call Read_direct(LittleEndian,modelinunit,irec+1,TmpModel, & 
                 nvarsdepth*Params%n_points+nvarssingle,iost1)           
+              If (iost1 .gt. 0) then
+                 Print *,'Error reading model',iost1
+                 Stop
+              End if
            If (Params%TwoComp) &
            Call Read_direct(LittleEndian,modelinunit2,irec+1,TmpModel2, & 
                 nvarsdepth*Params%n_points+nvarssingle,iost1)           
+              If (iost1 .gt. 0) then
+                 Print *,'Error reading model 2',iost1
+                 Stop
+              End if
            SizeModel=Size(TmpModel)
            If (Starting_at_abund(1) .gt. 0) then
               If (Abs(TmpModel(SizeModel-N_elements+1)-12.0) .gt. 0.001) & 
@@ -712,8 +728,7 @@ Program Nicole
            End if
            Call Record_to_model_2comp(Params%n_points, Guess_model, TmpModel, TmpModel2, KeepVars, 1)
            If (.not. Params%TwoComp) then
-	      Call model_assign(guess_model%comp2,guess_model%comp1) ! debug
-              !Guess_model%Comp2=Guess_model%Comp1
+              Call model_assign(guess_model%comp2,guess_model%comp1)
               Guess_model%Comp1%ffactor=1.0
            End if
            TaskComing=1 ! Notify slave that a new task is coming
@@ -1274,6 +1289,9 @@ Contains
              ! }}}
           End if
           Call Forward(Params, Line, Region, Guess_model, Syn_profile, Input%set_hydro)
+	  Call Fill_densities(Params, Input%input_dens, Guess_model%Comp1)
+          If (Params%TwoComp) &
+               Call Fill_densities(Params, Input%input_dens, Guess_model%Comp2)
           Call Record_to_Model_2comp(Params%n_points, Guess_model, TmpModel, TmpModel2, KeepVars,-1) 
           If (debug_level .ge. 1) then
              Write (Debug_FileUnit,*) ' Profile:'
@@ -1303,3 +1321,15 @@ Contains
 
 
 End Program Nicole
+
+Subroutine getmyrank(myrank)
+
+  Integer :: myrank, status
+
+  Include 'mpif.h'
+
+  myrank=0
+   Call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, status)
+  Return
+
+End Subroutine getmyrank

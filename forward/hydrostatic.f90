@@ -21,13 +21,14 @@ Subroutine Hydrostatic(Params, Atmo)
   Real, Parameter :: niters=30, Precision=1e-5
   Real, Dimension (Params%n_points) :: Kappa, Tau, temp
   Real, Dimension (10) :: Pp
-  Real, Parameter :: nu500 = cc/(5000.*1.e-8), Min_temp = 2500., &
+  Real, Parameter :: nu500 = cc/(5000.*1.e-8), Min_temp = 2000., &
        Mu=12.566370614 ! Vacuum permeability (G^2 cm^3/erg)=4*Pi, P_m=B^2/2/Mu
   Real :: dtau, dif, n2P, Scat, chi_0, chi_e, eta
   Real :: Avmolweight, Asum, Wsum, Pg_Old, OldKappa, metal
   Logical :: Warning1, Warning2
   Logical, Save :: FirstTime=.True.
-!
+  !
+
   Debug_warningflags(flag_hydrostatic)=0
   Debug_errorflags(flag_hydrostatic)=0
   Call time_routine('hydrostatic',.True.)
@@ -91,7 +92,6 @@ Subroutine Hydrostatic(Params, Atmo)
   ! solutions in the upper layers when running chromospheric inversions. 
   !
   !  Call Compute_Pg(1, temp(1), Atmo%El_p(1), Atmo%Gas_p(1))
-
   If (Params%Input_dens .ne. 'pel')  then
      Call Compute_Pe(1, temp(1), Atmo%Gas_p(1), Atmo%El_p(1))
   else
@@ -132,21 +132,23 @@ Subroutine Hydrostatic(Params, Atmo)
         Else
            Avmolweight=Wsum/(Asum+ &
                 Atmo%El_p(ipoint-1)/Atmo%Gas_p(ipoint-1))
-           Atmo%Gas_p(ipoint)=Atmo%Gas_p(ipoint-1) + &
+           Atmo%Gas_p(ipoint)=Atmo%Gas_p(ipoint-1)* &
                 exp(-Gravity/Avog/BK*Avmolweight* &
                 .5*(1./Atmo%Temp(ipoint)+1./Atmo%Temp(ipoint-1))* &
-                 (Atmo%Z_scale(ipoint-1)-Atmo%Z_scale(ipoint)))
+                (Atmo%Z_scale(ipoint)-Atmo%Z_scale(ipoint-1))*1e5)
         Endif
   
-!       Hydrostatic equilibrium equation.
+        !       Hydrostatic equilibrium equation.
         Call Compute_Pe(1, Temp(ipoint), Atmo%Gas_p(ipoint), Atmo%El_p(ipoint))
         OldKappa=Kappa(ipoint)
         n2P=BK*temp(ipoint)
         Call Compute_others_from_T_Pe_Pg(1,Temp(ipoint), Atmo%El_p(ipoint), Atmo%Gas_p(ipoint), Atmo%nH(ipoint), &
              Atmo%nHminus(ipoint), Atmo%nHplus(ipoint), Atmo%nH2(ipoint), Atmo%nH2plus(ipoint))
         Kappa(ipoint)=Background_opacity(Temp(ipoint), Atmo%El_p(ipoint), Atmo%Gas_p(ipoint), Atmo%nH(ipoint)*n2P, &
-             Atmo%nHminus(ipoint)*n2P, Atmo%nHplus(ipoint)*n2P, Atmo%nH2(ipoint)*n2P, Atmo%nH2plus(1)*n2P,&
+             Atmo%nHminus(ipoint)*n2P, Atmo%nHplus(ipoint)*n2P, Atmo%nH2(ipoint)*n2P, Atmo%nH2plus(ipoint)*n2P,&
              5000., Scat)
+        Avmolweight=Wsum/(Asum+ &
+             Atmo%El_P(ipoint)/Atmo%Gas_P(ipoint))
         Atmo%Rho(ipoint)=Atmo%Gas_p(ipoint)*Avmolweight/Avog/bk/temp(ipoint) ! Gas density
         Kappa(ipoint)=Kappa(ipoint)/Atmo%Rho(ipoint) ! Convert to cm^2/g
 
@@ -187,7 +189,7 @@ Subroutine Hydrostatic(Params, Atmo)
         End if
      End if
   End if
-
+  
   imin=MinLoc(Abs(Atmo%ltau_500))
   If (Params%hscale .eq. 't') &
        Atmo%Z_scale(1:Params%n_points)=Atmo%Z_scale(1:Params%n_points) - &

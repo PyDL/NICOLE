@@ -194,16 +194,20 @@ Module VirtualFiles
       If (Virtual) then ! Memory storage
          If (File .eq. 'JNY') then
             lJNY=-10
-            Allocate (DJNY(NDEP*NRAD*MQ))
+            If (.not. Allocated(DJNY)) &
+                 Allocate (DJNY(NDEP*NRAD*MQ))
          Else if (File .eq. 'OPC') then
             lOPC=-20
             ipointopc=1
-            Allocate (DXCONT(NDEP*NRAD*MQ))
-            Allocate (DSCAT(NDEP*NRAD*MQ))
-            ALLOCATE (DSC(NDEP*NRAD*MQ))
+            If (.not. allocated(DXCONT)) then
+               Allocate (DXCONT(NDEP*NRAD*MQ))
+               Allocate (DSCAT(NDEP*NRAD*MQ))
+               ALLOCATE (DSC(NDEP*NRAD*MQ))
+            End if
          Else if (File .eq. 'PHI') then
             lPHI=-30
             ipointphi=1
+            If (.not. allocated(DPHI)) &
             Allocate (DPHI(NDEP*NRAD*MQ*NMU))
          End if
          Return
@@ -241,16 +245,19 @@ Module VirtualFiles
       If (iunit .gt. 0) then ! Disk file
          Call Close_file (iunit)
       Else ! Memory file
-         If (iunit .eq. -10) Deallocate (DJNY)
+         If (iunit .eq. -10 .and. Allocated(DJNY)) Deallocate (DJNY)
          If (iunit .eq. -20) then
             ipointopc=1
-            Deallocate (DXCONT)
-            Deallocate (DSCAT)
-            Deallocate (DSC)
+            If (Allocated(DXCONT)) then
+               Deallocate (DXCONT)
+               Deallocate (DSCAT)
+               Deallocate (DSC)
+            End if
          End If
          If (iunit .eq. -30) Then
             ipointphi=1
-            Deallocate (DPHI)
+            If (Allocated(DPHI)) &
+                 Deallocate (DPHI)
          End if
       End if
       Return
@@ -415,6 +422,7 @@ Module NLTE_vars
      Integer :: NDEP, MQ, NMU, NRAD, Linear
      Real, Dimension(:,:), pointer :: Nstar, N, BPlanck, WPhi, Sl
      Real, Dimension(:,:,:), pointer :: W, F, C, Source_f
+     Real, Dimension(:,:), pointer :: Source_l_f
      Real, Dimension(:), pointer :: XMu, WMu, Xnorm
      Real :: OptThin, OptThick
      Logical :: Error=.False.
@@ -451,7 +459,7 @@ Contains
 ! The model is set in hydrostatic equilibrium in order to fill in the 
 ! required arrays (such as ne, nH, rho, etc)
 !
-Subroutine NLTE_init(Params, NLTEinput, NLTE, Atom, Atmo)
+Subroutine NLTE_init(Params, NLTEinput, NLTE, Atom, Atmo, ForceInit)
   Implicit None
   Type (Parameters) :: Params
   Type (Model) :: Atmo
@@ -461,9 +469,11 @@ Subroutine NLTE_init(Params, NLTEinput, NLTE, Atom, Atmo)
   Integer :: ielem, idepth
   Real, Dimension (:), Allocatable :: tmp1
   Logical, Save :: FirstTime=.TRUE.
-  Logical :: Error
+  Logical :: Error, ForceInit
   Real, Dimension (10) :: Pp
-!
+  !
+  If (ForceInit) FirstTime=.True.
+  !
   If (FirstTime) then ! All intializations
      Call Read_atom(Atom)
      Call Find_atomic_number
@@ -491,9 +501,12 @@ Subroutine NLTE_init(Params, NLTEinput, NLTE, Atom, Atmo)
 ! From here on may be needed for repeated calls with different atmospheres
 
   If (NLTEInput%Hydro) then
+
      Call Hydrostatic(Params, NLTE%Atmo) ! To fill in some arrays in Atmo
+
   Else ! Trust El_P, rho and Gas_P and fill the nH, nHplus, nHminus, 
-       !       nH2 columns of the model
+     !       nH2 columns of the model
+
      NLTE%Atmo%ne=NLTE%Atmo%el_p/BK/NLTE%Atmo%Temp
      Call Compute_others_from_T_Pe_Pg(NLTE%NDEP, NLTE%Atmo%Temp, &
           NLTE%Atmo%El_p, NLTE%Atmo%Gas_p, &
@@ -516,26 +529,30 @@ Subroutine NLTE_init(Params, NLTEinput, NLTE, Atom, Atmo)
 !
   Call BackgroundOpac(NLTE, NLTEInput, Atom) ! Compute background opacities
   Call VoigtProfs(NLTE, NLTEInput, Atom) ! Compute Voigt profiles
+
 !
   Return
 !
     contains
       Subroutine NLTE_allocations
-        Allocate (NLTE%C(Atom%NK, Atom%NK, NLTE%NDEP))
-        NLTE%C(:,:,:)=0.
-        Allocate (NLTE%F(Atom%NK, Atom%NK, NLTE%NDEP))
-        NLTE%F(:,:,:)=0.
-        Allocate (NLTE%W(Atom%NK, Atom%NK, NLTE%NDEP))
-        NLTE%W(:,:,:)=0.
-        Allocate (NLTE%Nstar(Atom%NK, NLTE%NDEP))
-        Allocate (NLTE%N(Atom%NK, NLTE%NDEP))
-        Allocate (NLTE%Xnorm(NLTE%NDEP))
-        Allocate (NLTE%BPlanck(NLTE%NDEP, Atom%NLIN+Atom%NCNT))
-        Allocate (NLTE%XMu(NLTEInput%NMU))
-        Allocate (NLTE%WMu(NLTEInput%NMU))
-        Allocate (NLTE%WPhi(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
-        Allocate (NLTE%Sl(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
-        Allocate (NLTE%Source_f(NLTE%NDEP,MaxNFreqs,Atom%NLIN+Atom%NCNT))
+        If (.not. Associated(NLTE%C)) then
+           Allocate (NLTE%C(Atom%NK, Atom%NK, NLTE%NDEP))
+           NLTE%C(:,:,:)=0.
+           Allocate (NLTE%F(Atom%NK, Atom%NK, NLTE%NDEP))
+           NLTE%F(:,:,:)=0.
+           Allocate (NLTE%W(Atom%NK, Atom%NK, NLTE%NDEP))
+           NLTE%W(:,:,:)=0.
+           Allocate (NLTE%Nstar(Atom%NK, NLTE%NDEP))
+           Allocate (NLTE%N(Atom%NK, NLTE%NDEP))
+           Allocate (NLTE%Xnorm(NLTE%NDEP))
+           Allocate (NLTE%BPlanck(NLTE%NDEP, Atom%NLIN+Atom%NCNT))
+           Allocate (NLTE%XMu(NLTEInput%NMU))
+           Allocate (NLTE%WMu(NLTEInput%NMU))
+           Allocate (NLTE%WPhi(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
+           Allocate (NLTE%Sl(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
+           Allocate (NLTE%Source_f(NLTE%NDEP,MaxNFreqs,Atom%NLIN+Atom%NCNT))
+           Allocate (NLTE%Source_l_f(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
+        End if
 !
         Return
       End Subroutine NLTE_allocations
@@ -589,39 +606,41 @@ Subroutine Allocate_atom_arrays(Atom)
   Implicit None
   Type (NLTE_Atom) :: Atom
   Integer :: status
-!
-  Allocate (Atom%cm_1(Atom%NK),stat=status)
-  Allocate (Atom%eV(Atom%NK),stat=status)
-  Allocate (Atom%g(Atom%NK),stat=status)
-  Allocate (Atom%lvl_label(Atom%NK),stat=status)
-  Allocate (Atom%ion(Atom%NK),stat=status)
-!
-  Allocate (Atom%GA(Atom%NLIN),stat=status)
-  Allocate (Atom%GW(Atom%NLIN),stat=status)
-  Allocate (Atom%GQ(Atom%NLIN),stat=status)
-!
-  Allocate (Atom%A(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%i(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%j(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%NQ(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%Q0(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%QMAX(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%f(Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%Alamb(Atom%NLIN+Atom%NCNT),stat=status)
-!
-  Allocate (Atom%iFIX(Atom%NFIX),stat=status)
-  Allocate (Atom%jFIX(Atom%NFIX),stat=status)
-  Allocate (Atom%ITRad(Atom%NFIX),stat=status)
-  Allocate (Atom%IPho(Atom%NFIX),stat=status)
-  Allocate (Atom%A0(Atom%NFIX),stat=status)
-  Allocate (Atom%TRad(Atom%NFIX),stat=status)
-!
-  Allocate (Atom%krad(Atom%NK,Atom%NK),stat=status)
-  Allocate (Atom%B(Atom%NK,Atom%NK),stat=status)
-  Allocate (Atom%FRQ(0:MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%Q(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%WQ(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
-  Allocate (Atom%AlphaC(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
+  !
+  If (.not. Associated(Atom%cm_1)) then
+     Allocate (Atom%cm_1(Atom%NK),stat=status)
+     Allocate (Atom%eV(Atom%NK),stat=status)
+     Allocate (Atom%g(Atom%NK),stat=status)
+     Allocate (Atom%lvl_label(Atom%NK),stat=status)
+     Allocate (Atom%ion(Atom%NK),stat=status)
+     !
+     Allocate (Atom%GA(Atom%NLIN),stat=status)
+     Allocate (Atom%GW(Atom%NLIN),stat=status)
+     Allocate (Atom%GQ(Atom%NLIN),stat=status)
+     !
+     Allocate (Atom%A(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%i(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%j(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%NQ(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%Q0(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%QMAX(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%f(Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%Alamb(Atom%NLIN+Atom%NCNT),stat=status)
+     !
+     Allocate (Atom%iFIX(Atom%NFIX),stat=status)
+     Allocate (Atom%jFIX(Atom%NFIX),stat=status)
+     Allocate (Atom%ITRad(Atom%NFIX),stat=status)
+     Allocate (Atom%IPho(Atom%NFIX),stat=status)
+     Allocate (Atom%A0(Atom%NFIX),stat=status)
+     Allocate (Atom%TRad(Atom%NFIX),stat=status)
+     !
+     Allocate (Atom%krad(Atom%NK,Atom%NK),stat=status)
+     Allocate (Atom%B(Atom%NK,Atom%NK),stat=status)
+     Allocate (Atom%FRQ(0:MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%Q(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%WQ(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
+     Allocate (Atom%AlphaC(MaxNFreqs,Atom%NLIN+Atom%NCNT),stat=status)
+  End if
 !
   Return
 !
@@ -807,8 +826,10 @@ Subroutine BackgroundOpac(NLTE, NLTEInput, Atom)
 !
 ! Calculate standard opacities at 500nm (will be used for normalization)
 !
+
   If (FirstTime) then
-     Allocate(Cont_op_5000_2(NLTE%NDEP))
+     If (.not. Allocated(Cont_op_5000_2)) &
+          Allocate(Cont_op_5000_2(NLTE%NDEP))
      Cont_op_5000_2(:)=-10
      FirstTime=.False.
   End if
@@ -831,13 +852,16 @@ Subroutine BackgroundOpac(NLTE, NLTEInput, Atom)
         XCONT(idepth)=Background_opacity(Atmo%Temp(idepth), Atmo%El_p(idepth), Atmo%Gas_p(idepth),Atmo%nH(idepth)*n2P, &
              Atmo%nHminus(idepth)*n2P, Atmo%nHplus(idepth)*n2P, Atmo%nH2(idepth)*n2P, &
              Atmo%nH2plus(idepth)*n2P, Atom%Alamb(itran), Scat(idepth))
+
         If (Cont_op_5000_2(idepth) .lt. 0) then
+
            Cont_op_5000_2(idepth)=Background_opacity(Atmo%Temp(idepth), Atmo%El_p(idepth),&
                 Atmo%Gas_p(idepth),Atmo%nH(idepth)*n2P,Atmo%nHminus(idepth)*n2P, &
                 Atmo%nHplus(idepth)*n2P, Atmo%nH2(idepth)*n2P, Atmo%nH2plus(idepth)*n2P, &
                 5000., Dummy(1))
         End if
 !        XCONT(idepth)=XCONT(idepth)/Cont_op_5000_2(idepth)
+
         NLTE%BPlanck(idepth,itran)=Planck(freq,NLTE%Atmo%Temp(idepth))
         SC(idepth)=(XCONT(idepth)-Scat(idepth))/XCONT(idepth)* &
              NLTE%BPlanck(idepth,itran)
@@ -4219,8 +4243,12 @@ Subroutine Read_NLTE_lines(Params, NLTEInput, NLTE, Atom, Line)
      Line(iline)%NLTEgrid(1)=0.
      If (Allocated(Line(iline)%NLTESource_f)) &
           Deallocate(Line(iline)%NLTESource_f)
+     If (Allocated(Line(iline)%NLTESource_l_f)) &
+          Deallocate(Line(iline)%NLTESource_l_f)
      Allocate (Line(iline)%NLTESource_f(NLTE%NDEP,1))
+     Allocate (Line(iline)%NLTESource_l_f(NLTE%NDEP))
      Line(iline)%NLTESource_f(NLTE%NDEP,1)=0.
+     Line(iline)%NLTESource_l_f(NLTE%NDEP)=0.
      i2=Line(iline)%NLTEtransition
      If (i2 .ge. 1) then
         Line(iline)%NLTEgridsize=Atom%NQ(i2)
@@ -4229,10 +4257,14 @@ Subroutine Read_NLTE_lines(Params, NLTEInput, NLTE, Atom, Line)
         Allocate(Line(iline)%NLTEgrid(Atom%NQ(i2)))
         If (Allocated(Line(iline)%NLTESource_f)) &
              Deallocate(Line(iline)%NLTESource_f)
+        If (Allocated(Line(iline)%NLTESource_l_f)) &
+             Deallocate(Line(iline)%NLTESource_l_f)
         Allocate(Line(iline)%NLTESource_f(NLTE%NDEP,Atom%NQ(i2)))
+        Allocate(Line(iline)%NLTESource_l_f(NLTE%NDEP))
         Line(iline)%NLTEgrid=Atom%Q(1:Atom%NQ(i2),i2)*NLTEInput%QNORM* &
              1.e5/cc*Atom%Alamb(i2) ! NLTE grid in A from line center
         Line(iline)%NLTESource_f(:,:)=NLTE%Source_f(:,1:Atom%NQ(i2),i2) ! cgs units
+        Line(iline)%NLTESource_l_f(:)=NLTE%Source_l_f(:,i2) ! cgs units
      End if
   End do
 !
@@ -4570,18 +4602,21 @@ Subroutine SolveStat(NLTE, NLTEInput, Atom)
      Saved_NLTE%N(:,:)=0.
      Allocate(Saved_NLTE%Source_f(NLTE%NDEP,MaxNFreqs,Atom%NLIN+Atom%NCNT))
      Saved_NLTE%Source_f(:,:,:)=0.
+     Allocate(Saved_NLTE%Source_l_f(NLTE%NDEP,Atom%NLIN+Atom%NCNT))
+     Saved_NLTE%Source_l_f(:,:)=0.
   Else
      If (MaxVal(Abs(NLTE%atmo%temp-Saved_NLTE%atmo%temp)) .lt. 1e-5 &
           .and. ( MaxVal(Abs(NLTE%atmo%v_los-Saved_NLTE%atmo%v_los)) .lt. 1e-5 &
                    .or. NLTEInput%VelFree ) &
           .and. MaxVal(Abs(NLTE%atmo%v_mic-Saved_NLTE%atmo%v_mic)) .lt. 1e-5 &
-          .and. .not. NLTE%Error) &
+          .and. .not. NLTE%Error ) & 
      then 
         If (NLTEInput%Verbose .ge. 3) &
              Print *,'Using previous populations'
         Call time_routine('solvestat',.False.)
         NLTE%N(:,:)=Saved_NLTE%N(:,:)
         NLTE%Source_f(:,:,:)=Saved_NLTE%Source_f(:,:,:)
+        NLTE%Source_l_f(:,:)=Saved_NLTE%Source_l_f(:,:)
         NLTE%Error=Saved_NLTE%Error
         NLTE%atmo=Saved_NLTE%atmo
         Return
@@ -4691,6 +4726,7 @@ Subroutine SolveStat(NLTE, NLTEInput, Atom)
 ! Compute monochromatic radiation field and local operator
               If (imu .eq. 1) NLTE%Source_f(:,inu,itran)=S(:)             
 !              If (imu .eq. 1) NLTE%Source_f(:,inu,itran)=NLTE%Sl(:,itran)
+              If (imu .eq. 1) NLTE%Source_l_f(:,itran)=NLTE%Sl(:,itran)    
 
               Call time_routine('NLTE_formalsolution',.True.)
               Call FormalSolution(NLTE, imu, inu, itran, NLTEInput%NLTE_formal_solution, &
@@ -5024,6 +5060,7 @@ Subroutine SolveStat(NLTE, NLTEInput, Atom)
   If (RelChg .lt. NLTEInput%elim2 .and. .not. NLTE%Error) then
      Saved_NLTE%N(1:Atom%NK,1:NLTE%NDEP)=NLTE%N(1:Atom%NK,1:NLTE%NDEP)
      Saved_NLTE%Source_f(:,:,:)=NLTE%Source_f(:,:,:)
+     Saved_NLTE%Source_l_f(:,:)=NLTE%Source_l_f(:,:)
      Saved_NLTE%Error=NLTE%Error
      !Saved_NLTE%atmo=NLTE%atmo
      Call Model_assign(Saved_NLTE%atmo,NLTE%atmo)

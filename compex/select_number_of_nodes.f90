@@ -13,58 +13,6 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
 !
 ! Initialize number of nodes to -1
 !
-!!$!
-!!$! Is there a nodes.dat file?
-!!$!
-!!$  Inquire(File='nodes.dat', Exist=Exists) ! Check in the current dir
-!!$  If (Exists) then 
-!!$     Call Open_file(File_unit, 'nodes.dat')
-!!$     Read=.False.
-!!$     End=.False.
-!!$     If (Params%Printout .ge. 1) Print *,'Reading nodes.dat file'
-!!$     Do While (.not. End)
-!!$        Call Read_next_nocomment(File_unit, String, End)
-!!$        Call Tolower(String)
-!!$        Call Read_int(String,'number of cycles:', &
-!!$             itmp, i_pos)
-!!$        If (i_pos .ne. 0) Params%ncycles=itmp
-!!$        Call Read_int(String, 'cycle:', itmp, i_pos)
-!!$        If (i_pos .ne. 0) then
-!!$           Read=.False.
-!!$           If (itmp .eq. icall) Read=.True.
-!!$        End if
-!!$        If (Read) then 
-!!$           Call Read_int(String,'nodes in temperature:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_t=itmp
-!!$           Call Read_int(String,'nodes in velocity:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_v=itmp
-!!$           Call Read_int(String,'nodes in magnetic field:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_b=itmp
-!!$           Call Read_int(String,'nodes in microturbulence:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_mic=itmp
-!!$           Call Read_int(String,'nodes in inclination:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_inc=itmp
-!!$           Call Read_int(String,'nodes in azimuth:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_azi=itmp
-!!$           Call Read_int(String,'nodes in macroturbulence:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_mac=itmp
-!!$           Call Read_int(String,'nodes in stray light:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_stray=itmp
-!!$           Call Read_int(String,'nodes in expansion:', &
-!!$                itmp, i_pos)
-!!$           If (i_pos .ne. 0) Nodes%n_nodes_exp=itmp
-!!$        End if
-!!$        End Do
-!!$     Close (File_unit)
-!!$  End if
 !
 ! Set all nodes in component 2 to zero
 !
@@ -74,6 +22,8 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
   If (Nodes%n_nodes_mic2 .eq. -1) Nodes%n_nodes_mic2=0
   If (Nodes%n_nodes_bx2 .eq. -1) Nodes%n_nodes_bx2=0
   If (Nodes%n_nodes_by2 .eq. -1) Nodes%n_nodes_by2=0
+  If (Nodes%n_nodes_chrom_x2 .eq. -1) Nodes%n_nodes_chrom_x2=0
+  If (Nodes%n_nodes_chrom_y2 .eq. -1) Nodes%n_nodes_chrom_y2=0
 
 !  
   If (icall .eq. 1) then 
@@ -89,6 +39,8 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      If (Nodes%n_nodes_mac .eq. -1) Nodes%n_nodes_mac=0
      If (Nodes%n_nodes_stray .eq. -1) Nodes%n_nodes_stray=0
      If (Nodes%n_nodes_ffactor .eq. -1) Nodes%n_nodes_ffactor=0
+     If (Nodes%n_nodes_chrom_x .eq. -1) Nodes%n_nodes_chrom_x=0
+     If (Nodes%n_nodes_chrom_y .eq. -1) Nodes%n_nodes_chrom_y=0
      If (Maxval(Abs(Params%Stray_prof)) .lt. 1.e-10) &
           Nodes%n_nodes_stray=0
      If (Params%IProfExists) Nodes%n_nodes_mac=0
@@ -98,7 +50,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
 ! Set 4 nodes in temperature, 2 in v, B_str, B_inc, and 1 in
 ! everything else
 !
-     If (Nodes%n_nodes_t .eq. -1) Nodes%n_nodes_t=8
+     If (Nodes%n_nodes_t .eq. -1) Nodes%n_nodes_t=6
      If (Nodes%n_nodes_v .eq. -1) Nodes%n_nodes_v=4
      If (Nodes%n_nodes_blong .eq. -1) Nodes%n_nodes_blong=4
      If (Nodes%n_nodes_mic .eq. -1) Nodes%n_nodes_mic=2
@@ -107,6 +59,8 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      If (Nodes%n_nodes_mac .eq. -1) Nodes%n_nodes_mac=1
      If (Nodes%n_nodes_stray .eq. -1) Nodes%n_nodes_stray=1
      If (Nodes%n_nodes_ffactor .eq. -1) Nodes%n_nodes_ffactor=1
+     If (Nodes%n_nodes_chrom_x .eq. -1) Nodes%n_nodes_chrom_x=1
+     If (Nodes%n_nodes_chrom_y .eq. -1) Nodes%n_nodes_chrom_y=1
      If (Maxval(Abs(Params%Stray_prof)) .lt. 1.e-10) &
           Nodes%n_nodes_stray=0
   End if
@@ -120,6 +74,8 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      If (Nodes%n_nodes_mac .eq. -1) Nodes%n_nodes_mac=1
      If (Nodes%n_nodes_stray .eq. -1) Nodes%n_nodes_stray=0
      If (Nodes%n_nodes_ffactor .eq. -1) Nodes%n_nodes_ffactor=0
+     If (Nodes%n_nodes_chrom_x .eq. -1) Nodes%n_nodes_chrom_x=1
+     If (Nodes%n_nodes_chrom_y .eq. -1) Nodes%n_nodes_chrom_y=1
      If (Maxval(Abs(Params%Stray_prof)) .lt. 1.e-10) &
           Nodes%n_nodes_stray=0
      If (Params%IProfExists) Nodes%n_nodes_mac=0
@@ -131,11 +87,13 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
   Params%n_free_parameters=Nodes%n_nodes_t + Nodes%n_nodes_v + &
        Nodes%n_nodes_blong + Nodes%n_nodes_mic + Nodes%n_nodes_bx + &
        Nodes%n_nodes_by + Nodes%n_nodes_mac + Nodes%n_nodes_stray + &
-       Nodes%n_nodes_ffactor + Nodes%n_nodes_ab
+       Nodes%n_nodes_ffactor + Nodes%n_nodes_ab + &
+       Nodes%n_nodes_chrom_x + Nodes%n_nodes_chrom_y
   Params%n_free_parameters=Params%n_free_parameters+ &
        Nodes%n_nodes_t2 + Nodes%n_nodes_v2 + &
        Nodes%n_nodes_blong2 + Nodes%n_nodes_mic2 + Nodes%n_nodes_bx2 + &
-       Nodes%n_nodes_by2 + Nodes%n_nodes_ab2
+       Nodes%n_nodes_by2 + Nodes%n_nodes_ab2 + &
+       Nodes%n_nodes_chrom_x2 + Nodes%n_nodes_chrom_y2
 
 !
 ! Location of the nodes:
@@ -165,12 +123,12 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
   Allocate(Nodes%i_nodes_mic(Max(Nodes%n_nodes_mic,1)), Stat=status)
   Allocate(Nodes%i_nodes_bx(Max(Nodes%n_nodes_bx,1)), Stat=status)
   Allocate(Nodes%i_nodes_by(Max(Nodes%n_nodes_by,1)), Stat=status)
-  Allocate(Nodes%i_nodes_t2(Max(Nodes%n_nodes_t,1)), Stat=status)
-  Allocate(Nodes%i_nodes_v2(Max(Nodes%n_nodes_v,1)), Stat=status)
-  Allocate(Nodes%i_nodes_blong2(Max(Nodes%n_nodes_blong,1)), Stat=status)
-  Allocate(Nodes%i_nodes_mic2(Max(Nodes%n_nodes_mic,1)), Stat=status)
-  Allocate(Nodes%i_nodes_bx2(Max(Nodes%n_nodes_bx,1)), Stat=status)
-  Allocate(Nodes%i_nodes_by2(Max(Nodes%n_nodes_by,1)), Stat=status)
+  Allocate(Nodes%i_nodes_t2(Max(Nodes%n_nodes_t2,1)), Stat=status)
+  Allocate(Nodes%i_nodes_v2(Max(Nodes%n_nodes_v2,1)), Stat=status)
+  Allocate(Nodes%i_nodes_blong2(Max(Nodes%n_nodes_blong2,1)), Stat=status)
+  Allocate(Nodes%i_nodes_mic2(Max(Nodes%n_nodes_mic2,1)), Stat=status)
+  Allocate(Nodes%i_nodes_bx2(Max(Nodes%n_nodes_bx2,1)), Stat=status)
+  Allocate(Nodes%i_nodes_by2(Max(Nodes%n_nodes_by2,1)), Stat=status)
 !
 ! Place the nodes
 !
@@ -182,8 +140,13 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
              UserNodeLocations(ivar,inode+1))
      End do
   Else
-     Call place_nodes(Params%n_points, Nodes%n_nodes_t, Atmo%ltau_500, &
-          Nodes%i_nodes_t)
+     If (Nodes%n_nodes_chrom_x+Nodes%n_nodes_chrom_y .ge. 1) then
+        Call place_nodes(Params%n_points, Nodes%n_nodes_t, Atmo%ltau_500, &
+             Nodes%i_nodes_t,-3.)
+     Else
+        Call place_nodes(Params%n_points, Nodes%n_nodes_t, Atmo%ltau_500, &
+             Nodes%i_nodes_t,-100.)
+     Endif
   End if
   ivar=ivar+1 
    If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -194,7 +157,8 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_v, Atmo%ltau_500, &
-          Nodes%i_nodes_v)
+          Nodes%i_nodes_v,-100.)
+        
   Endif
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -205,7 +169,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_mic, Atmo%ltau_500, &
-          Nodes%i_nodes_mic)
+          Nodes%i_nodes_mic,-100.)
   End if
   ivar=ivar+1 
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -216,7 +180,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_blong, Atmo%ltau_500, &
-          Nodes%i_nodes_blong)
+          Nodes%i_nodes_blong,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -227,7 +191,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_bx, Atmo%ltau_500, &
-          Nodes%i_nodes_bx)
+          Nodes%i_nodes_bx,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -238,7 +202,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_by, Atmo%ltau_500, &
-          Nodes%i_nodes_by)
+          Nodes%i_nodes_by,-100.)
   End if
 !
   ivar=7 ! T2
@@ -249,8 +213,13 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
              UserNodeLocations(ivar,inode+1))
      End do
   Else
-     Call place_nodes(Params%n_points, Nodes%n_nodes_t2, Atmo%ltau_500, &
-          Nodes%i_nodes_t2)
+     If (Nodes%n_nodes_chrom_x2+Nodes%n_nodes_chrom_y2 .ge. 1) then
+        Call place_nodes(Params%n_points, Nodes%n_nodes_t2, Atmo%ltau_500, &
+             Nodes%i_nodes_t2,-3.)
+     Else
+        Call place_nodes(Params%n_points, Nodes%n_nodes_t2, Atmo%ltau_500, &
+             Nodes%i_nodes_t2,-100.)
+     Endif
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -261,7 +230,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_v2, Atmo%ltau_500, &
-          Nodes%i_nodes_v2)
+          Nodes%i_nodes_v2,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -272,7 +241,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_mic2, Atmo%ltau_500, &
-          Nodes%i_nodes_mic2)
+          Nodes%i_nodes_mic2,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -283,7 +252,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_blong2, Atmo%ltau_500, &
-          Nodes%i_nodes_blong2)
+          Nodes%i_nodes_blong2,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -294,7 +263,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_bx2, Atmo%ltau_500, &
-          Nodes%i_nodes_bx2)
+          Nodes%i_nodes_bx2,-100.)
   End if
   ivar=ivar+1
   If (UserNodeLocations(ivar,1) .ge. 0) then
@@ -305,7 +274,7 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
      End do
   Else
      Call place_nodes(Params%n_points, Nodes%n_nodes_by2, Atmo%ltau_500, &
-          Nodes%i_nodes_by2)
+          Nodes%i_nodes_by2,-100.)
   End if
 !
 ! Done!
@@ -313,18 +282,21 @@ Subroutine Select_number_of_nodes(Params, Atmo, Nodes, icall)
   Return
 End Subroutine Select_number_of_nodes
 !
-Subroutine Place_nodes(npoints, nnodes, x, inodes)
+Subroutine Place_nodes(npoints, nnodes, x, inodes, upperbound)
   Implicit None
   Integer :: npoints, nnodes, Find_index
   Real, dimension (npoints) :: x
   Integer, dimension (nnodes) :: inodes
-  Real :: xdistance
+  Real :: xdistance, upperbound
   Integer :: ind, ilow, iup
   Real, dimension (nnodes) :: xnodes
 !
 ! Equispace through model
 !
   iup=1
+  Do while (x(iup) .lt. upperbound .and. iup .lt. npoints)
+     iup=iup+1
+  End do
   ilow=npoints
 !
 !!$!

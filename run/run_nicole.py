@@ -339,7 +339,7 @@ for icycle in range(int(ncycles)):
         print 'Unknown value for "Eq state for H"'
         print 'Must be NICOLE, Asensio, Asensio273 or Wittmann'
         sys.exit(1)
-    peconsistency=get_value(config,'Pe consistency','1e-1','NICOLE.input')
+    peconsistency=get_value(config,'Pe consistency','1e-4','NICOLE.input')
     debug=get_value(config,'Debug mode','0','NICOLE.input')
     interp=get_value(config,'Optimize grid','-','NICOLE.input')
     outputpop=get_value(config,'Output populations','0','NICOLE.input')
@@ -423,6 +423,15 @@ for icycle in range(int(ncycles)):
         always_compute_der='1' 
     else: 
         always_compute_der='0'
+    cent_der=cent_der.lower()
+    if cent_der != 'y' and cent_der != 'n' and cent_der !='1' and cent_der != '0':
+        print 'Error in NICOLE.input'
+        print 'Centered derivatives must be either Y or N'
+        sys.exit(1)
+    if cent_der == 'y': 
+        cent_der='1' 
+    else: 
+        cent_der='0'
     interp=interp.lower()
     interp=interp[0:1]
     if interp == '-': # Default
@@ -480,6 +489,9 @@ for icycle in range(int(ncycles)):
         nlines=nlines+1
         line=get_value(config,'Line',None,'NICOLE.input','Line '+str(nlines),)
     nlines=str(nlines-1)
+    if (nlines == '0') & (mode != 'c'):
+        print('Error! No lines have been specified')
+        sys.exit(1)
     nregions=0
     region=''
     while region != None:
@@ -608,8 +620,10 @@ for icycle in range(int(ncycles)):
     elim1=get_value(config,'Elim','-','NICOLE.input','NLTE')
     if elim1 == '-':
         elim1=get_value(config,'Populations relative change','-','NICOLE.input','NLTE')
+    if elim1 == '-':
+        elim1=get_value(config,'conv','-','NICOLE.input','NLTE')
     if elim1 == '-': 
-        elim1='1e-3'
+        elim1='1e-4'
         if mode == 'i': elim1='1e-4'
     isum=get_value(config,'isum','1','NICOLE.input','NLTE')
     istart=get_value(config,'istart','1','NICOLE.input','NLTE')
@@ -760,10 +774,16 @@ for icycle in range(int(ncycles)):
         nodesby=str(len(locnod))
         for i in range(99-len(locnod)): locnod.append(0.)
         nodesbyx=locnod
+    nodesSx=get_value(config,'chromospheric step position','-1','NICOLE.input','Nodes')
+    if nodesSx == '-1': nodesSx=get_value(config,'chrom x','-1','NICOLE.input','Nodes')
+    if nodesSx == '-1': nodesSx=get_value(config,'Sx','-1','NICOLE.input','Nodes')
+    nodesSy=get_value(config,'chromospheric temperature increase','-1','NICOLE.input','Nodes')
+    if nodesSy == '-1': nodesSy=get_value(config,'chrom y','-1','NICOLE.input','Nodes')
+    if nodesSy == '-1': nodesSy=get_value(config,'Sy','-1','NICOLE.input','Nodes')
     nodesstray=get_value(config,'Stray','-1','NICOLE.input','Nodes')
     if nodesstray == '-1': nodesstray=get_value(config,'Stray light','-1','NICOLE.input','Nodes')
-    nodesexp=get_value(config,'ffactor','-1','NICOLE.input','Nodes')
-    if nodesexp == '-1': nodesexp=get_value(config,'filling factor','-1','NICOLE.input','Nodes')
+    nodesffactor=get_value(config,'ffactor','-1','NICOLE.input','Nodes')
+    if nodesffactor == '-1': nodesffactor=get_value(config,'filling factor','-1','NICOLE.input','Nodes')
     nodesab=get_value(config,'Abundances','-1','NICOLE.input','Nodes')
     if nodesab == '-1': nodesab=get_value(config,'Number of abundances','-1','NICOLE.input','Nodes')
 # Nodes for the second component
@@ -842,6 +862,12 @@ for icycle in range(int(ncycles)):
         nodesby2=str(len(locnod))
         for i in range(99-len(locnod)): locnod.append(0.)
         nodesbyx2=locnod
+    nodesSx2=get_value(config,'chromospheric step position','-1','NICOLE.input','Nodes 2')
+    if nodesSx2 == '-1': nodesSx2=get_value(config,'chrom x','-1','NICOLE.input','Nodes 2')
+    if nodesSx2 == '-1': nodesSx2=get_value(config,'Sx','-1','NICOLE.input','Nodes')
+    nodesSy2=get_value(config,'chromospheric temperature increase','-1','NICOLE.input','Nodes 2')
+    if nodesSy2 == '-1': nodesSy2=get_value(config,'chrom y','-1','NICOLE.input','Nodes 2')
+    if nodesSy2 == '-1': nodesSy2=get_value(config,'Sy','-1','NICOLE.input','Nodes 2')
     nodesab2=get_value(config,'Abundances','-1','NICOLE.input','Nodes 2')
     if nodesab2 == '-1': nodesab2=get_value(config,'Number of abundances','-1','NICOLE.input','Nodes 2')
     f=open('nodelocations.dat'+suffix,'wb')
@@ -959,7 +985,7 @@ for icycle in range(int(ncycles)):
             nxmod=nxout ; nymod=nyout ; nz=nzout
         if inputmodel2 !='':
             [filemodemod2,nxmod2,nymod2,nz2]=check_model(inputmodel2)
-            if (filemodemod2 != 'nicole2.6' or nxmod2 != nxmod or nymod2 != nymod
+            if (filemodemod2 != 'nicole1804' or nxmod2 != nxmod or nymod2 != nymod
                 or nz2 != nz): 
                 print 'Error. Model 2 is not in native binary format or is not'
                 print 'compatible with model 1'
@@ -976,13 +1002,13 @@ for icycle in range(int(ncycles)):
             if nxprof*nyprof > nxmod*nymod:
                 print 'The input model will be padded by repeating the last model'
             padding=1
-        if padding == 0 and (filemodemod == 'nicole2.6' or icycle >= 1):
+        if padding == 0 and (filemodemod == 'nicole1804' or icycle >= 1):
             useorigfilemod=1
         else:
             useorigfilemod=0
             f=open('__inputmodel.bin'+suffix,'wb')
-            f.write(struct.pack('<16s'+int4f+int4f+intf,'nicole2.6bm     ',nxprof,nyprof,nz)) # First record
-            for i in range(22*nz+3+8+92-16/8-1-1): f.write(struct.pack('<'+flf,0.)) # Fill record
+            f.write(struct.pack('<16s'+int4f+int4f+intf,'nicole1804m     ',nxprof,nyprof,nz)) # First record
+            for i in range(22*nz+13+92-16/8-1-1): f.write(struct.pack('<'+flf,0.)) # Fill record
             percent=-1
             seq=0
             for ix in range(nxprof):
@@ -998,16 +1024,9 @@ for icycle in range(int(ncycles)):
                     try:
                         data=read_model(inputmodel, filemodemod, nx, ny, nz, ix2, iy2, sequential=seq)
                     except:
-                        data=[x*0. for x in range(22*nz+3+8+92)]
+                        data=[x*0. for x in range(22*nz+13+92)]
                         print 'error in file ',inputmodel
-                    if filemodemod != 'nicole2.6': # Old format, need to add abundances
-                        for ab in numab:
-                            data.append(float(ab))
-                        if len(abundances) != 92:
-                            print 'Number of elements in the abundance set != 92'
-                            sys.exit(2)
                     seq=1
-
                     for d in data: f.write(struct.pack('<'+flf,d))
                     if ((ix*ny+iy+1)*100./nx/ny > percent):
                         percent=int((ix*ny+iy+1)*1./nx/ny*100)
@@ -1075,24 +1094,18 @@ for icycle in range(int(ncycles)):
         nx=nxmod
         ny=nymod
         useorigfileprof=0
-        if filemodemod == 'nicole2.6' or icycle >= 1:
+        if filemodemod == 'nicole1804' or icycle >= 1:
             useorigfilemod=1
         else:
             useorigfilemod=0
             f=open('__inputmodel.bin'+suffix,'wb')
-            f.write(struct.pack('<16s'+int4f+int4f+intf,'nicole2.6bm     ',nxmod,nymod,nz)) # First record
-            for i in range(22*nz+92+3+8-16/8-1-1): f.write(struct.pack('<'+flf,0.)) # Fill record
+            f.write(struct.pack('<16s'+int4f+int4f+intf,'nicole18.04     ',nxmod,nymod,nz)) # First record
+            for i in range(22*nz+92+13-16/8-1-1): f.write(struct.pack('<'+flf,0.)) # Fill record
             percent=-1
             seq=0
             for ix in range(nxmod):
                 for iy in range(nymod):
                     data=read_model(inputmodel, filemodemod, nx, ny, nz, ix, iy, sequential=seq)
-                    if filemodemod != 'nicole2.6': # Old format, need to add abundances
-                        for ab in numab:
-                            data.append(ab)
-                        if len(abundances) != 92:
-                            print 'Number of elements in the abundance set != 92'
-                            sys.exit(2)
                     for d in data: f.write(struct.pack('<'+flf,d))
                     if (int((ix*ny+(iy+1))*100./nx/ny) > percent):
                         percent=int((ix*ny+(iy+1))*100./nx/ny)
@@ -1479,9 +1492,11 @@ for icycle in range(int(ncycles)):
     f.write(nodesblong+' ! Nodes in B_long \n')
     f.write(nodesbx+' ! Nodes in B_x \n')
     f.write(nodesby+' ! Nodes in B_y \n')
+    f.write(nodesSx+' ! Nodes in Sx \n')
+    f.write(nodesSy+' ! Nodes in Sy \n')
     f.write(nodesstray+' ! Nodes in Stray light \n')
     f.write(nodesvmac+' ! Nodes in v_mac \n')
-    f.write(nodesexp+' ! Nodes in ffactor \n')
+    f.write(nodesffactor+' ! Nodes in ffactor \n')
     nab=0
     if nodesab != '-1' and nodesab != '0': 
         nodesab=nodesab.lower()
@@ -1498,6 +1513,8 @@ for icycle in range(int(ncycles)):
     f.write(nodesblong2+' ! Nodes in B_long 2\n')
     f.write(nodesbx2+' ! Nodes in B_x 2\n')
     f.write(nodesby2+' ! Nodes in B_y 2\n')
+    f.write(nodesSx2+' ! Nodes in Sx 2 \n')
+    f.write(nodesSy2+' ! Nodes in Sy 2 \n')
     nab=0
     if nodesab2 != '-1': 
         nodesab2=nodesab2.lower()

@@ -51,7 +51,6 @@ def check_model (filename):
     import struct
     import sys
 
-
     [int4f,intf,flf]=check_types()
     try:
         f=open(filename,'r')
@@ -64,7 +63,7 @@ def check_model (filename):
     f=open(filename,'rb')
     header=f.read(16+4+4+8)
     [string,ny,nz]=struct.unpack('<16s'+intf+intf,header)
-    string=string[0:11] # Remove padding zeros at the end
+    string=string.strip()
     if string == 'nicole1.6bm': # Older format version
         filetype='nicole1.6'
         nx=1
@@ -86,12 +85,22 @@ def check_model (filename):
             print 'The file is probably corrupted. Proceeding anyway...'
 #            sys.exit(1)
         return [filetype,nx,ny,nz]
-    if string == 'nicole2.6bm': # Current format version
+    if string == 'nicole2.6bm': # Old format version
         filetype='nicole2.6'
         [string,nx,ny,nz]=struct.unpack('<16s'+int4f+int4f+intf,header)
         f.close()
         filesize=os.path.getsize(filename)
         if filesize != (22*nz+3+8+92)*(nx*ny+1)*8:
+            print 'Incorrect size of model file:',filename
+            print 'The file is probably corrupted. Proceeding anyway...'
+#            sys.exit(1)
+        return [filetype,nx,ny,nz]
+    if string == 'nicole1804m': # Current format version
+        filetype='nicole1804'
+        [string,nx,ny,nz]=struct.unpack('<16s'+int4f+int4f+intf,header)
+        f.close()
+        filesize=os.path.getsize(filename)
+        if filesize != (22*nz+13+92)*(nx*ny+1)*8:
             print 'Incorrect size of model file:',filename
             print 'The file is probably corrupted. Proceeding anyway...'
 #            sys.exit(1)
@@ -209,7 +218,7 @@ def check_prof (filename):
     f=open(filename,'rb')
     header=f.read(16+8+8)
     [readstr,ny,nlam]=struct.unpack('<16s'+intf+intf,header)
-    readstr=readstr[0:11]
+    readstr=readstr.strip()
     if readstr == 'nicole1.6bp': # Older format version
         filetype='nicole1.6'
         nx=1
@@ -356,7 +365,7 @@ def read_prof(filename, filetype, nx, ny, nlam, ix, iy, sequential=0):
         for i in range(len(data)): data[i]=float(data[i])
         return data
     else:
-        print 'Unknown file type'
+        print 'Unknown profile file type:'+filetype
         sys.exit(1)
 
 def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
@@ -481,6 +490,8 @@ def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
         data.append(stray_frac)
         data.append(expansion)
         for i in range(8): data.append(0) # Keep el_p,gas_p,rho,nH,nH-,nH+,nH2,nH2+
+        for ind in range(2): data.append(0.) # chrom_x,chrom_y
+        for ind in range(92): data.append(0.) # abundances
         for i in range(len(data)): data[i]=float(data[i])
         return data
     elif filetype == 'nicole1.6':
@@ -516,6 +527,8 @@ def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
                 data2[(17+ivar)*nz+ind]=0. 
         data2[22*nz:22*nz+3]=data[13*nz:13*nz+3] # v_mac, stray_frac, expansion
         for ind in range(8): data2[22*nz+3+ind]=0. # keep
+        for ind in range(2): data2.append(0.) # chrom_x,chrom_y
+        for ind in range(92): data2.append(0.) # abundances
         f.close()
         return data2
     elif filetype == 'nicole2.3':
@@ -535,6 +548,8 @@ def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
                 data2.append(0.)
         for ind in range(3): data2.append(data[13*nz+ind]) # v_mac, stray_frac, expansion
         for ind in range(8): data2.append(0.) # keep
+        for ind in range(2): data2.append(0.) # chrom_x,chrom_y
+        for ind in range(92): data2.append(0.) # abundances
         for ind in range(len(data2)): data2[ind]=float(data2[ind])
         return data2
     elif filetype == 'nicole2.6':
@@ -542,7 +557,21 @@ def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
             irec=iy+ix*ny
         else:
             irec=irec+1
-        sizerec=22*nz+3+8+92 # Floats (multiply by 8 to convert to bytes)
+        sizerec=22*nz+11+92 # Floats (multiply by 8 to convert to bytes)
+        if (sequential == 0):
+            f=open(filename,'rb')
+            f.seek(sizerec*8*(irec+1)) # Skip header and previous records
+        data=struct.unpack('<'+str(sizerec)+flf,f.read(sizerec*8))
+        data=list(data)
+        data.insert(22*nz+11,1.)
+        data.insert(22*nz+11,-5.)
+        return data
+    elif filetype == 'nicole1804':
+        if (sequential == 0):
+            irec=iy+ix*ny
+        else:
+            irec=irec+1
+        sizerec=22*nz+13+92 # Floats (multiply by 8 to convert to bytes)
         if (sequential == 0):
             f=open(filename,'rb')
             f.seek(sizerec*8*(irec+1)) # Skip header and previous records
@@ -792,5 +821,5 @@ def read_model(filename, filetype, nx, ny, nz, ix, iy, sequential=0):
         for i in range(len(data)): data[i]=float(data[i])
         return data
     else:
-        print 'Unknown file type'
+        print 'Unknown model file type:'+filetype
         sys.exit(1)
